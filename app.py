@@ -65,15 +65,6 @@ vector_store: AzureSearch = AzureSearch(
     embedding_function=embeddings.embed_query,
 )
 
-# Initialize Pinecone
-pc = Pinecone(api_key=PINECONE_API_KEY)
-if index_name not in pc.list_indexes().names():
-    pc.create_index(
-        name=index_name,
-        dimension=1536,
-        metric="cosine",
-        spec=ServerlessSpec(cloud="aws", region="us-east-1"),
-    )
 
 #llm
 llm=AzureChatOpenAI(
@@ -98,17 +89,7 @@ def process_pdfs(pdf_storage_path: str):
         documents = loader.load()
         docs += text_splitter.split_documents(documents)
 
-    # # Convert text to embeddings
-    # for doc in docs:
-    #     embedding = embeddings.embed_query(doc.page_content)
-    #     random_id = str(uuid.uuid4())
-    #     #print (embedding)
-    #     doc_search = pc.Index(index_name)
-    #     #doc_search = Pinecone (doc_search, embeddings.embed_query, doc.page_content, random_id)
-
-    # # Store the vector in Pinecone index
-    #     doc_search.upsert(vectors = [{"id": random_id, "values": embedding, "metadata": {"source": doc.page_content}}])
-    #     print("Vector stored in Pinecone index successfully.")
+  
     vector_store.add_documents(documents=docs)
 
 
@@ -130,9 +111,6 @@ from langchain.chains.combine_documents import create_stuff_documents_chain
 @cl.on_chat_start
 async def start():
     await cl.Message(content=welcome_message).send()
-    # docsearch = Pinecone.from_existing_index(
-    #     index_name=index_name, embedding=embeddings, namespace=namespace
-    # )
 
     message_history = ChatMessageHistory()
 
@@ -149,27 +127,10 @@ async def start():
         service_name="tomwong",
     )
 
-    # chain = ConversationalRetrievalChain.from_llm(
-    #    ,
-    #     chain_type="stuff",
-    #     retriever=retriver,
-    #     memory=memory,
-    #     return_source_documents=True,
-    # )
-
-
-    # cl.user_session.set("chain", chain)
 
 
 @cl.on_message
 async def main(message: cl.Message):
-    # chain = cl.user_session.get("chain")  # type: ConversationalRetrievalChain
-
-    # cb = cl.LangchainCallbackHandler()
-
-    # res = await chain.acall(message.content, callbacks=[cb])
-    # retriever = vector_store.as_retriever()
-    
     system_prompt = (
     "You are an assistant for question-answering tasks. "
     "Only Use the following pieces of retrieved context to answer "
@@ -184,14 +145,8 @@ async def main(message: cl.Message):
     ]
     )
 
-    # retriever = AzureAISearchRetriever(
-    #     content_key="content",
-    #     index_name="langchain-vector-demo",
-    #     api_key=VECTOR_STORE_ADDRESS,
-    #     service_name="tomwong",
-    # )
+
     retriever = vector_store.as_retriever()
-    # source_documents = retriever.invoke(message.content)
     question_answer_chain = create_stuff_documents_chain(llm, prompt)
     rag_chain = create_retrieval_chain(retriever, question_answer_chain)
 
